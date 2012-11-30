@@ -39,9 +39,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.hibernate.engine.spi.RowSelection;
-import org.jboss.logging.Logger;
-
 import org.hibernate.HibernateException;
 import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
@@ -62,6 +59,7 @@ import org.hibernate.dialect.lock.SelectLockingStrategy;
 import org.hibernate.dialect.pagination.LegacyLimitHandler;
 import org.hibernate.dialect.pagination.LimitHandler;
 import org.hibernate.engine.jdbc.LobCreator;
+import org.hibernate.engine.spi.RowSelection;
 import org.hibernate.engine.spi.SessionImplementor;
 import org.hibernate.exception.spi.ConversionContext;
 import org.hibernate.exception.spi.SQLExceptionConversionDelegate;
@@ -83,9 +81,9 @@ import org.hibernate.sql.CaseFragment;
 import org.hibernate.sql.ForUpdateFragment;
 import org.hibernate.sql.JoinFragment;
 import org.hibernate.type.StandardBasicTypes;
-import org.hibernate.type.descriptor.sql.BlobTypeDescriptor;
 import org.hibernate.type.descriptor.sql.ClobTypeDescriptor;
 import org.hibernate.type.descriptor.sql.SqlTypeDescriptor;
+import org.jboss.logging.Logger;
 
 /**
  * Represents a dialect of SQL implemented by a particular RDBMS.
@@ -314,6 +312,23 @@ public abstract class Dialect implements ConversionContext {
 		return getTypeName( code, Column.DEFAULT_LENGTH, Column.DEFAULT_PRECISION, Column.DEFAULT_SCALE );
 	}
 
+	public String cast(String value, int jdbcTypeCode, int length, int precision, int scale) {
+		if ( jdbcTypeCode == Types.CHAR ) {
+			return "cast(" + value + " as char(" + length + "))";
+		}
+		else {
+			return "cast(" + value + "as " + getTypeName( jdbcTypeCode, length, precision, scale ) + ")";
+		}
+	}
+
+	public String cast(String value, int jdbcTypeCode, int length) {
+		return cast( value, jdbcTypeCode, length, Column.DEFAULT_PRECISION, Column.DEFAULT_SCALE );
+	}
+
+	public String cast(String value, int jdbcTypeCode, int precision, int scale) {
+		return cast( value, jdbcTypeCode, Column.DEFAULT_LENGTH, precision, scale );
+	}
+
 	/**
 	 * Subclasses register a type name for the given type code and maximum
 	 * column length. <tt>$l</tt> in the type name with be replaced by the
@@ -378,10 +393,6 @@ public abstract class Dialect implements ConversionContext {
 	protected SqlTypeDescriptor getSqlTypeDescriptorOverride(int sqlCode) {
 		SqlTypeDescriptor descriptor;
 		switch ( sqlCode ) {
-			case Types.BLOB: {
-				descriptor = useInputStreamToInsertBlob() ? BlobTypeDescriptor.STREAM_BINDING : null;
-				break;
-			}
 			case Types.CLOB: {
 				descriptor = useInputStreamToInsertBlob() ? ClobTypeDescriptor.STREAM_BINDING : null;
 				break;
@@ -604,7 +615,9 @@ public abstract class Dialect implements ConversionContext {
 	// function support ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 	protected void registerFunction(String name, SQLFunction function) {
-		sqlFunctions.put( name, function );
+		// HHH-7721: SQLFunctionRegistry expects all lowercase.  Enforce,
+		// just in case a user's customer dialect uses mixed cases.
+		sqlFunctions.put( name.toLowerCase(), function );
 	}
 
 	/**
@@ -2364,5 +2377,38 @@ public abstract class Dialect implements ConversionContext {
 	public boolean supportsTupleDistinctCounts() {
 		// oddly most database in fact seem to, so true is the default.
 		return true;
+	}
+
+	/**
+	 * Return the limit that the underlying database places on the number elements in an {@code IN} predicate.
+	 * If the database defines no such limits, simply return zero or less-than-zero.
+	 * 
+	 * @return int The limit, or zero-or-less to indicate no limit.
+	 */
+	public int getInExpressionCountLimit() {
+		return 0;
+	}
+	
+	/**
+	 * HHH-4635
+	 * Oracle expects all Lob values to be last in inserts and updates.
+	 * 
+	 * @return boolean True of Lob values should be last, false if it
+	 * does not matter.
+	 */
+	public boolean forceLobAsLastValue() {
+		return false;
+	}
+
+	/**
+	 * Some dialects have trouble applying pessimistic locking depending upon what other query options are
+	 * specified (paging, ordering, etc).  This method allows these dialects to request that locking be applied
+	 * by subsequent selects.
+	 *
+	 * @return {@code true} indicates that the dialect requests that locking be applied by subsequent select;
+	 * {@code false} (the default) indicates that locking should be applied to the main SQL statement..
+	 */
+	public boolean useFollowOnLocking() {
+		return false;
 	}
 }

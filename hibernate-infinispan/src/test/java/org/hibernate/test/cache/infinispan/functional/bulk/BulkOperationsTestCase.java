@@ -27,19 +27,19 @@ import java.util.Set;
 import javax.transaction.Status;
 import javax.transaction.TransactionManager;
 
+import org.hibernate.test.cache.infinispan.functional.SingleNodeTestCase;
 import org.junit.Test;
 
 import org.hibernate.FlushMode;
 import org.hibernate.Session;
-import org.hibernate.cache.infinispan.InfinispanRegionFactory;
 import org.hibernate.cache.spi.RegionFactory;
 import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.cfg.Environment;
 import org.hibernate.engine.transaction.internal.jta.CMTTransactionFactory;
 import org.hibernate.engine.transaction.spi.TransactionFactory;
-import org.hibernate.service.jdbc.connections.spi.ConnectionProvider;
-import org.hibernate.service.jta.platform.spi.JtaPlatform;
+import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider;
+import org.hibernate.engine.transaction.jta.platform.spi.JtaPlatform;
 import org.hibernate.stat.SecondLevelCacheStatistics;
 import org.hibernate.test.cache.infinispan.functional.Contact;
 import org.hibernate.test.cache.infinispan.functional.Customer;
@@ -73,7 +73,7 @@ public class BulkOperationsTestCase extends BaseCoreFunctionalTestCase {
 	}
 
 	protected Class<? extends RegionFactory> getCacheRegionFactory() {
-		return InfinispanRegionFactory.class;
+		return SingleNodeTestCase.TestInfinispanRegionFactory.class;
 	}
 
 	protected Class<? extends TransactionFactory> getTransactionFactoryClass() {

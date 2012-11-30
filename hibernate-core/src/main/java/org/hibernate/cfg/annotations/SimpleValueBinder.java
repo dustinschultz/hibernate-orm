@@ -24,12 +24,11 @@
 package org.hibernate.cfg.annotations;
 
 import java.io.Serializable;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.TypeVariable;
-import java.sql.Types;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Properties;
+
 import javax.persistence.AttributeConverter;
 import javax.persistence.Convert;
 import javax.persistence.Converts;
@@ -140,10 +139,11 @@ public class SimpleValueBinder {
 
 	//TODO execute it lazily to be order safe
 
-	public void setType(XProperty property, XClass returnedClass) {
+	public void setType(XProperty property, XClass returnedClass, String declaringClassName) {
 		if ( returnedClass == null ) {
+			// we cannot guess anything
 			return;
-		} //we cannot guess anything
+		}
 		XClass returnedClassOrElement = returnedClass;
                 boolean isArray = false;
 		if ( property.isArray() ) {
@@ -224,7 +224,6 @@ public class SimpleValueBinder {
 					.toXClass( Serializable.class )
 					.isAssignableFrom( returnedClassOrElement ) ) {
 				type = SerializableToBlobType.class.getName();
-				//typeParameters = new Properties();
 				typeParameters.setProperty(
 						SerializableToBlobType.CLASS_NAME,
 						returnedClassOrElement.getName()
@@ -237,6 +236,17 @@ public class SimpleValueBinder {
 		}
 		else if ( ( !key && property.isAnnotationPresent( Enumerated.class ) )
 				|| ( key && property.isAnnotationPresent( MapKeyEnumerated.class ) ) ) {
+			final Class attributeJavaType = mappings.getReflectionManager().toClass( returnedClassOrElement );
+			if ( !Enum.class.isAssignableFrom( attributeJavaType ) ) {
+				throw new AnnotationException(
+						String.format(
+								"Attribute [%s.%s] was annotated as enumerated, but its java type is not an enum [%s]",
+								declaringClassName,
+								xproperty.getName(),
+								attributeJavaType.getName()
+						)
+				);
+			}
 			type = EnumType.class.getName();
 			explicitType = type;
 		}
@@ -602,6 +612,7 @@ public class SimpleValueBinder {
 					parameters.put( DynamicParameterizedType.IS_PRIMARY_KEY, Boolean.toString( key ) );
 
 					parameters.put( DynamicParameterizedType.ENTITY, persistentClassName );
+					parameters.put( DynamicParameterizedType.XPROPERTY, xproperty );
 					parameters.put( DynamicParameterizedType.PROPERTY, xproperty.getName() );
 					parameters.put( DynamicParameterizedType.ACCESS_TYPE, accessType.getType() );
 					simpleValue.setTypeParameters( parameters );

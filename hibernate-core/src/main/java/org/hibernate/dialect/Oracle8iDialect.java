@@ -58,6 +58,8 @@ import org.hibernate.type.descriptor.sql.SqlTypeDescriptor;
  * @author Steve Ebersole
  */
 public class Oracle8iDialect extends Dialect {
+	
+	private static final int PARAM_LIST_SIZE_LIMIT = 1000;
 
 	public Oracle8iDialect() {
 		super();
@@ -121,6 +123,7 @@ public class Oracle8iDialect extends Dialect {
 		registerFunction( "acos", new StandardSQLFunction("acos", StandardBasicTypes.DOUBLE) );
 		registerFunction( "asin", new StandardSQLFunction("asin", StandardBasicTypes.DOUBLE) );
 		registerFunction( "atan", new StandardSQLFunction("atan", StandardBasicTypes.DOUBLE) );
+		registerFunction( "bitand", new StandardSQLFunction("bitand") );
 		registerFunction( "cos", new StandardSQLFunction("cos", StandardBasicTypes.DOUBLE) );
 		registerFunction( "cosh", new StandardSQLFunction("cosh", StandardBasicTypes.DOUBLE) );
 		registerFunction( "exp", new StandardSQLFunction("exp", StandardBasicTypes.DOUBLE) );
@@ -551,15 +554,31 @@ public class Oracle8iDialect extends Dialect {
 		return false;
 	}
 
-
-	// Overridden informational metadata ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	@Override
 	public boolean supportsEmptyInList() {
 		return false;
 	}
+	
 	@Override
 	public boolean supportsExistsInSelect() {
 		return false;
 	}
 
+	/* (non-Javadoc)
+		 * @see org.hibernate.dialect.Dialect#getInExpressionCountLimit()
+		 */
+	@Override
+	public int getInExpressionCountLimit() {
+		return PARAM_LIST_SIZE_LIMIT;
+	}
+	
+	@Override
+	public boolean forceLobAsLastValue() {
+		return true;
+	}
+
+	@Override
+	public boolean useFollowOnLocking() {
+		return true;
+	}
 }

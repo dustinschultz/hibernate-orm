@@ -23,17 +23,15 @@
  */
 package org.hibernate.internal;
 
-import javax.persistence.ParameterMode;
 import java.sql.CallableStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.hibernate.JDBCException;
-import org.hibernate.StoredProcedureCall.StoredProcedureParameter;
 import org.hibernate.StoredProcedureOutputs;
 import org.hibernate.StoredProcedureResultSetReturn;
 import org.hibernate.StoredProcedureReturn;
@@ -45,7 +43,7 @@ import org.hibernate.loader.custom.CustomLoader;
 import org.hibernate.loader.custom.CustomQuery;
 import org.hibernate.loader.custom.Return;
 import org.hibernate.loader.custom.sql.SQLQueryReturnProcessor;
-import org.hibernate.service.jdbc.cursor.spi.RefCursorSupport;
+import org.hibernate.engine.jdbc.cursor.spi.RefCursorSupport;
 
 /**
  * @author Steve Ebersole
@@ -302,6 +300,8 @@ public class StoredProcedureOutputsImpl implements StoredProcedureOutputs {
 			this.session = session;
 		}
 
+		// todo : this would be a great way to add locking to stored procedure support (at least where returning entities).
+
 		public List processResultSet(ResultSet resultSet) throws SQLException {
 			super.autoDiscoverTypes( resultSet );
 			return super.processResultSet(
@@ -310,7 +310,8 @@ public class StoredProcedureOutputsImpl implements StoredProcedureOutputs {
 					session,
 					true,
 					null,
-					Integer.MAX_VALUE
+					Integer.MAX_VALUE,
+					Collections.<AfterLoadAction>emptyList()
 			);
 		}
 	}

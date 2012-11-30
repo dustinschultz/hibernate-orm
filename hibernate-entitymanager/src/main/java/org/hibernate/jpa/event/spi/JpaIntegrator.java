@@ -23,7 +23,8 @@
  */
 package org.hibernate.jpa.event.spi;
 
-import javax.enterprise.inject.spi.BeanManager;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -54,7 +55,6 @@ import org.hibernate.jpa.event.internal.core.JpaPostLoadEventListener;
 import org.hibernate.jpa.event.internal.core.JpaPostUpdateEventListener;
 import org.hibernate.jpa.event.internal.core.JpaSaveEventListener;
 import org.hibernate.jpa.event.internal.core.JpaSaveOrUpdateEventListener;
-import org.hibernate.jpa.event.internal.jpa.BeanManagerListenerFactory;
 import org.hibernate.jpa.event.internal.jpa.CallbackProcessor;
 import org.hibernate.jpa.event.internal.jpa.CallbackProcessorImpl;
 import org.hibernate.jpa.event.internal.jpa.CallbackRegistryConsumer;
@@ -70,7 +70,7 @@ import org.hibernate.secure.internal.JACCPreInsertEventListener;
 import org.hibernate.secure.internal.JACCPreLoadEventListener;
 import org.hibernate.secure.internal.JACCPreUpdateEventListener;
 import org.hibernate.secure.internal.JACCSecurityListener;
-import org.hibernate.service.classloading.spi.ClassLoaderService;
+import org.hibernate.boot.registry.classloading.spi.ClassLoaderService;
 import org.hibernate.service.spi.ServiceRegistryImplementor;
 import org.hibernate.service.spi.SessionFactoryServiceRegistry;
 
@@ -187,10 +187,10 @@ public class JpaIntegrator implements Integrator {
 		// handle JPA "entity listener classes"...
 
 		this.callbackRegistry = new CallbackRegistryImpl();
-		final BeanManager beanManager = (BeanManager) configuration.getProperties().get( AvailableSettings.CDI_BEAN_MANAGER );
-		this.jpaListenerFactory = beanManager == null
+		final Object beanManagerRef = configuration.getProperties().get( AvailableSettings.CDI_BEAN_MANAGER );
+		this.jpaListenerFactory = beanManagerRef == null
 				? new StandardListenerFactory()
-				: new BeanManagerListenerFactory( beanManager );
+				: buildBeanManagerListenerFactory( beanManagerRef );
 		this.callbackProcessor = new LegacyCallbackProcessor( jpaListenerFactory, configuration.getReflectionManager() );
 
 		Iterator classes = configuration.getClassMappings();
@@ -210,6 +210,36 @@ public class JpaIntegrator implements Integrator {
 					( (CallbackRegistryConsumer) listener ).injectCallbackRegistry( callbackRegistry );
 				}
 			}
+		}
+	}
+
+	private static final String CDI_LISTENER_FACTORY_CLASS = "org.hibernate.jpa.event.internal.jpa.BeanManagerListenerFactory";
+
+	private ListenerFactory buildBeanManagerListenerFactory(Object beanManagerRef) {
+		try {
+			// specifically using our classloader here...
+			final Class beanManagerListenerFactoryClass = getClass().getClassLoader()
+					.loadClass( CDI_LISTENER_FACTORY_CLASS );
+			final Method beanManagerListenerFactoryBuilderMethod = beanManagerListenerFactoryClass.getMethod(
+					"fromBeanManagerReference",
+					Object.class
+			);
+
+			try {
+				return (ListenerFactory) beanManagerListenerFactoryBuilderMethod.invoke( null, beanManagerRef );
+			}
+			catch (InvocationTargetException e) {
+				throw e.getTargetException();
+			}
+		}
+		catch (ClassNotFoundException e) {
+			throw new HibernateException( "Could not locate BeanManagerListenerFactory class to handle CDI extensions", e );
+		}
+		catch (HibernateException e) {
+			throw e;
+		}
+		catch (Throwable e) {
+			throw new HibernateException( "Could not access BeanManagerListenerFactory class to handle CDI extensions", e );
 		}
 	}
 
@@ -288,10 +318,10 @@ public class JpaIntegrator implements Integrator {
 		// handle JPA "entity listener classes"...
 
 		this.callbackRegistry = new CallbackRegistryImpl();
-		final BeanManager beanManager = (BeanManager) sessionFactory.getProperties().get( AvailableSettings.CDI_BEAN_MANAGER );
-		this.jpaListenerFactory = beanManager == null
+		final Object beanManagerRef = sessionFactory.getProperties().get( AvailableSettings.CDI_BEAN_MANAGER );
+		this.jpaListenerFactory = beanManagerRef == null
 				? new StandardListenerFactory()
-				: new BeanManagerListenerFactory( beanManager );
+				: buildBeanManagerListenerFactory( beanManagerRef );
 		this.callbackProcessor = new CallbackProcessorImpl( jpaListenerFactory, metadata, serviceRegistry );
 
         for ( EntityBinding binding : metadata.getEntityBindings() ) {

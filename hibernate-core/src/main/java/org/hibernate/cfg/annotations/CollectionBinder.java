@@ -795,7 +795,7 @@ public abstract class CollectionBinder {
 			String entityName = oneToMany.getReferencedEntityName();
 			PersistentClass referenced = mappings.getClass( entityName );
 			Backref prop = new Backref();
-			prop.setName( '_' + fkJoinColumns[0].getPropertyName() + "Backref" );
+			prop.setName( '_' + fkJoinColumns[0].getPropertyName() + '_' + fkJoinColumns[0].getLogicalColumnName() + "Backref" );
 			prop.setUpdateable( false );
 			prop.setSelectable( false );
 			prop.setCollectionRole( collection.getRole() );
@@ -1288,7 +1288,7 @@ public abstract class CollectionBinder {
 					column.setTable( collValue.getCollectionTable() );
 				}
 				elementBinder.setColumns( elementColumns );
-				elementBinder.setType( property, elementClass );
+				elementBinder.setType( property, elementClass, collValue.getOwnerEntityName() );
 				elementBinder.setPersistentClassName( propertyHolder.getEntityName() );
 				elementBinder.setAccessType( accessType );
 				collValue.setElement( elementBinder.make() );
